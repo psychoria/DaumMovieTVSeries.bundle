@@ -57,11 +57,16 @@ def searchDaumMovie(results, media, lang):
         title = String.DecodeHTMLEntities(String.StripTags(item['titleKo'])).strip()
         id = str(item['movieId'])
         if year == media.year:
-            score = 95
+            score = 85
         elif len(items) == 1:
-            score = 80
+            score = 75
         else:
             score = 10
+
+        if media_name == title:
+            score += 15
+        elif title.find(media_name) != -1:
+            score += 10
         Log.Debug('ID=%s, media_name=%s, title=%s, year=%s, score=%d' %(id, media_name, title, year, score))
         results.Append(MetadataSearchResult(id=id, name=title, year=year, score=score, lang=lang))
 
@@ -76,11 +81,16 @@ def searchDaumMovieTVSeries(results, media, lang):
         id = str(item['tvProgramId'])
         title = String.DecodeHTMLEntities(String.StripTags(item['titleKo'])).strip()
         if year == media.year:
-            score = 95
+            score = 85
         elif len(items) == 1:
-            score = 80
+            score = 75
         else:
             score = 10
+
+        if media_name == title:
+            score += 15
+        elif title.find(media_name) != -1:
+            score += 10
         Log.Debug('ID=%s, media_name=%s, title=%s, year=%s, score=%d' %(id, media_name, title, year, score))
         results.Append(MetadataSearchResult(id=id, name=title, year=year, score=score, lang=lang))
 
