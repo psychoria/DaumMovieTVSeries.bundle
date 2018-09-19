@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
 # Daum Movie TV Series
 
-import os, urllib, unicodedata, json, re, fnmatch
+import os
+import urllib
+import unicodedata
+import json
+import re
+import fnmatch
 from collections import OrderedDict
 from difflib import SequenceMatcher
 
-DAUM_MOVIE_SRCH   = "http://movie.daum.net/data/movie/search/v2/movie.json?size=20&start=1&searchText=%s"
+DAUM_MOVIE_SRCH = "http://movie.daum.net/data/movie/search/v2/movie.json?size=20&start=1&searchText=%s"
 DAUM_MOVIE_DETAIL = "http://movie.daum.net/moviedb/main?movieId=%s"
-DAUM_MOVIE_CAST   = "http://movie.daum.net/data/movie/movie_info/cast_crew.json?pageNo=1&pageSize=100&movieId=%s"
-DAUM_MOVIE_PHOTO  = "http://movie.daum.net/data/movie/photo/movie/list.json?pageNo=1&pageSize=200&id=%s"
+DAUM_MOVIE_CAST = "http://movie.daum.net/data/movie/movie_info/cast_crew.json?pageNo=1&pageSize=100&movieId=%s"
+DAUM_MOVIE_PHOTO = "http://movie.daum.net/data/movie/photo/movie/list.json?pageNo=1&pageSize=200&id=%s"
 
-#DAUM_TV_SRCH   = "http://movie.daum.net/data/movie/search/v2/tv.json?size=20&start=1&searchText=%s"
-DAUM_TV_SRCH      = "https://search.daum.net/search?w=tot&q=%s"
-DAUM_TV_DETAIL    = "http://movie.daum.net/tv/main?tvProgramId=%s"
-#DAUM_TV_CAST       = "http://movie.daum.net/tv/crew?tvProgramId=%s"
-#DAUM_TV_PHOTO      = "http://movie.daum.net/data/movie/photo/tv/list.json?pageNo=1&pageSize=100&id=%s"
-DAUM_TV_EPISODE   = "http://movie.daum.net/tv/episode?tvProgramId=%s"
-DAUM_TV_SERIES    = "http://movie.daum.net/tv/series_list.json?tvProgramId=%s&programIds=%s"
-#http://movie.daum.net/tv/program.json?programIds=79584
-JSON_MAX_SIZE      = 10 * 1024 * 1024
+DAUM_TV_SRCH = "https://search.daum.net/search?w=tot&q=%s"
+DAUM_TV_DETAIL = "https://search.daum.net/search?w=tv&q=%s&irk=%s&irt=tv-program&DA=TVP"
+DAUM_TV_EPISODE = "http://movie.daum.net/tv/episode?tvProgramId=%s"
+DAUM_TV_SERIES = "http://movie.daum.net/tv/series_list.json?tvProgramId=%s&programIds=%s"
+JSON_MAX_SIZE = 10 * 1024 * 1024
+
 DAUM_CR_TO_MPAA_CR = {
     u'전체관람가': {
         'KMRB': 'kr/A',
@@ -36,19 +38,18 @@ DAUM_CR_TO_MPAA_CR = {
         'KMRB': 'kr/R',
         'MPAA': 'R'
     },
-    u'제한상영가': {     # 어느 여름날 밤에 (2016)
+    u'제한상영가': {  # 어느 여름날 밤에 (2016)
         'KMRB': 'kr/X',
         'MPAA': 'NC-17'
     }
 }
 
-def Start():
-    HTTP.CacheTime = CACHE_1HOUR * 0
-    HTTP.Headers['Accept'] = 'text/html, application/json'
-    global PLEX_LIBRARY
-    PLEX_LIBRARY = GetPlexLibrary()
 
-####################################################################################################
+def Start():
+    HTTP.CacheTime = CACHE_1HOUR * 12
+    HTTP.Headers['Accept'] = 'text/html, application/json'
+
+
 def searchDaumMovie(results, media, lang):
     media_name = media.name
     media_name = unicodedata.normalize('NFKC', unicode(media_name)).strip()
@@ -71,84 +72,10 @@ def searchDaumMovie(results, media, lang):
         Log.Debug('ID=%s, media_name=%s, title=%s, year=%s, score=%d' %(id, media_name, title, year, score))
         results.Append(MetadataSearchResult(id=id, name=title, year=year, score=score, lang=lang))
 
-def searchDaumMovieTVSeries(results, media, lang):
-# 다음에서 미디어 이름으로 검색후 결과를 보여준다
-# 검색결과의 점수가 95점이면 자동 매치
-# 자동 매치가 안되면 검색 결과를 보여준다.
-
-#검색결과
-#//div[@id='tvpColl']//div[@class='head_cont']//a[@class='tit_info']/text()|//div[@id='tvpColl']//div[@class='head_cont']//a[@class='tit_info']/@href|//div[@id='tvpColl']//div[@class='head_cont']//span[@class='txt_summary']
-
-#시리즈
-#//div[@id='tvpColl']//div[@id='tab_content']//div[@id='tv_series']//ul/li/a[@class='f_link_b']/text()|//div[@id='tvpColl']//div[@id='tab_content']//div[@id='tv_series']//ul/li/a[@class='f_link_b']/@href|//div[@id='tvpColl']//div[@id='tab_content']//div[@id='tv_series']//ul/li/span/text()
-
-
-#동명콘텐트
-#//div[@id='tvpColl']//div[@id='tab_content']//div[@class='coll_etc']//dd/a[@class='f_link']/text()|//div[@id='tvpColl']//div[@id='tab_content']//div[@class='coll_etc']//dd/a[@class='f_link']/@href|//div[@id='tvpColl']//div[@id='tab_content']//div[@class='coll_etc']//dd/span[@class='f_eb']/text()
-#//div[@id='tvpColl']//div[@id='tab_content']//dt[contains(.,'동명 콘텐츠')]/following-sibling::dd/a[@class='f_link']
-#//div[@id='tvpColl']//div[@id='tab_content']//dt[contains(.,'동명 콘텐츠')]/following-sibling::dd/a[@class='f_link']/@href
-#//div[@id='tvpColl']//div[@id='tab_content']//dt[contains(.,'동명 콘텐츠')]/following-sibling::dd/span[@class='f_eb']
-    items = []
-    media_name = media.show
-    media_name = unicodedata.normalize('NFKC', unicode(media_name)).strip()
-
-    Log.Debug("search: %s %s" %(media_name, media.year))
-#    data = JSON.ObjectFromURL(url=DAUM_TV_SRCH % (urllib.quote(media_name.encode('utf8'))))
-
-#검색결과
-    html = HTML.ElementFromURL(url=DAUM_TV_SRCH % (urllib.quote(media_name.encode('utf8'))))
-    title = html.xpath('//div[@id="tvpColl"]//div[@class="head_cont"]//a[@class="tit_info"]')[0].text.strip()
-    id     = html.xpath('substring-before(substring-after(//div[@id="tvpColl"]//div[@class="head_cont"]//a[@class="tit_info"]/@href, "irk="),"&")').strip()
-    year = html.xpath('//div[@class="head_cont"]//span[@class="txt_summary"][last()]')[0].text.strip()
-    match = Regex('(\d{4})\.\d*\.\d*~').search(year)
-    if match:
-        try: year = match.group(1)
-        except: year = ''
-    items.append({"title":title, "id":id, "year":year})
-
-#시리즈
-    seriesNumber = html.xpath('count(//div[@id="tvpColl"]//div[@id="tab_content"]//div[@id="tv_series"]//ul/li/a[@class="f_link_b"])')
-    for i in range(1, int(seriesNumber)+1):
-        title = html.xpath('//div[@id="tvpColl"]//div[@id="tab_content"]//div[@id="tv_series"]//ul/li[' + str(i) + ']/a[@class="f_link_b"]')[0].text.strip()
-        id     = html.xpath('substring-before(substring-after(//div[@id="tvpColl"]//div[@id="tab_content"]//div[@id="tv_series"]//ul/li[' + str(i) + ']/a[@class="f_link_b"]/@href, "irk="),"&")').strip()
-        year = html.xpath('//div[@id="tvpColl"]//div[@id="tab_content"]//div[@id="tv_series"]//ul/li[' + str(i) + ']/span')[0].text.strip()
-        match = Regex('(\d{4})\.').search(year)
-        if match:
-            try: year = match.group(1)
-            except: year = ''
-        items.append({"title":title, "id":id, "year":year})
-
-#동명 콘텐츠
-    sameNameNumber = html.xpath('count(//div[@id="tvpColl"]//div[@id="tab_content"]//dt[contains(.,"' + u'동명 콘텐츠' + '")]/following-sibling::dd/a[@class="f_link"])')
-    for i in range(1, int(sameNameNumber)+1):
-        title = html.xpath('//div[@id="tvpColl"]//div[@id="tab_content"]//dt[contains(.,"' + u'동명 콘텐츠' + '")]/following-sibling::dd/a[' + str(i) + '][@class="f_link"]')[0].text.strip()
-        id   = html.xpath('substring-before(substring-after(//div[@id="tvpColl"]//div[@id="tab_content"]//dt[contains(.,"' + u'동명 콘텐츠' + '")]/following-sibling::dd/a[' + str(i) + '][@class="f_link"]/@href, "irk="),"&")').strip()
-        year = html.xpath('//div[@id="tvpColl"]//div[@id="tab_content"]//dt[contains(.,"' + u'동명 콘텐츠' + '")]/following-sibling::dd/span[@class="f_eb"][' + str(i) + ']')[0].text.strip()
-        match = Regex('(\d{4})\)').search(year)
-        if match:
-            try: year = match.group(1)
-            except: year = ''
-        items.append({"title":title, "id":id, "year":year})
-
-    for item in items:
-        year = str(item['year'])
-        id = str(item['id'])
-        title = item['title']
-        if year == media.year:
-            score = 85
-        elif len(items) == 1:
-            score = 75
-        else:
-            score = 10
-
-        ratio = SequenceMatcher(None, title, media_name).ratio()
-        score += int(15 * ratio)
-        Log.Debug('ID=%s, media_name=%s, title=%s, year=%s, score=%d' %(id, media_name, title, year, score))
-        results.Append(MetadataSearchResult(id=id, name=title, year=year, score=score, lang=lang))
 
 def updateDaumMovie(metadata):
     poster_url = None
-    #Set Movie basic metadata
+    # Set Movie basic metadata
     try:
         html = HTML.ElementFromURL(DAUM_MOVIE_DETAIL % metadata.id)
         title = html.xpath('//div[@class="subject_movie"]/strong')[0].text
@@ -193,7 +120,7 @@ def updateDaumMovie(metadata):
     except Exception, e:
         Log.Debug(repr(e))
         pass
-    #Get Acotrs & Crew Info
+    # Get Acotrs & Crew Info
     directors = []
     producers = []
     writers = []
@@ -226,7 +153,7 @@ def updateDaumMovie(metadata):
             if item['photo']['fullname']:
                 role['photo'] = item['photo']['fullname']
             roles.append(role)
-    #Set Crew Info
+    # Set Crew Info
     if directors:
         metadata.directors.clear()
         for director in directors:
@@ -252,7 +179,7 @@ def updateDaumMovie(metadata):
             if 'photo' in writer:
                 meta_writer.photo = writer['photo']
 
-    #Set Acotrs Info 
+    # Set Acotrs Info
     if roles:
         metadata.roles.clear()
         for role in roles:
@@ -264,7 +191,7 @@ def updateDaumMovie(metadata):
             if 'photo' in role:
                 meta_role.photo = role['photo']
 
-    #Get Photo
+    # Get Photo
     data = JSON.ObjectFromURL(url=DAUM_MOVIE_PHOTO % metadata.id)
     max_poster = int(Prefs['max_num_posters'])
     max_art = int(Prefs['max_num_arts'])
@@ -275,427 +202,165 @@ def updateDaumMovie(metadata):
             art_url = item['fullname']
             if not art_url: continue
             idx_poster += 1
-            try: metadata.posters[art_url] = Proxy.Preview(HTTP.Request(item['thumbnail']), sort_order = idx_poster)
-            except: pass
+            try:
+                metadata.posters[art_url] = Proxy.Preview(HTTP.Request(item['thumbnail']), sort_order=idx_poster)
+            except:
+                pass
         elif item['photoCategory'] in ['2', '50'] and idx_art < max_art:
             art_url = item['fullname']
             if not art_url: continue
             idx_art += 1
-            try: metadata.art[art_url] = Proxy.Preview(HTTP.Request(item['thumbnail']), sort_order = idx_art)
-            except: pass
+            try:
+                metadata.art[art_url] = Proxy.Preview(HTTP.Request(item['thumbnail']), sort_order=idx_art)
+            except:
+                pass
     Log.Debug('Total %d posters, %d artworks' %(idx_poster, idx_art))
     if idx_poster == 0:
         if poster_url:
-            poster = HTTP.Request( poster_url )
-            try: metadata.posters[poster_url] = Proxy.Media(poster)
-            except: pass
+            poster = HTTP.Request(poster_url)
+            try:
+                metadata.posters[poster_url] = Proxy.Media(poster)
+            except:
+                pass
 
-def updateDaumMovieTVSeries(metadata, media, programIds):
-# 다음에서 메타정보를 가져와서 정보를 업데이트
-# JSON 파일이 있는 경우 기존 메타 정보를 덮어쓴다
-    poster_url = None
-    special_actor_data = OrderedDict()
-    json_actor_data = OrderedDict()
-    actor_data = OrderedDict()
-    season_num_list = []
-    for season_num in media.seasons:
-        season_num_list.append(season_num)
-    season_num_list.sort(key=int)
 
-    #TV show 메타정보가지고 오기
-    series_json_data = JSON.ObjectFromURL(url=DAUM_TV_SERIES % (metadata.id, programIds))
-    #TV show 기본 메타정보 
+def searchDaumMovieTVSeries(results, media, lang):
+    items = []
+    media_name = media.show
+    media_name = unicodedata.normalize('NFKC', unicode(media_name)).strip()
+
+    Log.Debug('search: %s %s' % (media_name, media.year))
+
+    # 검색결과
+    html = HTML.ElementFromURL(url=DAUM_TV_SRCH % (urllib.quote(media_name.encode('utf8'))))
+    base_path = html.xpath('//div[@id="tvpColl"]//div[@class="head_cont"]')[0]
+    title = base_path.xpath('//a[@class="tit_info"]')[0].text.strip()
+    id = Regex('irk=([^&]+)').search(base_path.xpath('//a[@class="tit_info"]/@href')[0]).group(1)
+    year = base_path.xpath('//span[@class="txt_summary"][last()]')[0].text.strip()
+    match = Regex('(\d{4})(\.\d*\.\d*~)?').search(year)
+    if match:
+        try:
+            year = match.group(1)
+        except Exception:
+            year = ''
+    items.append({'title': title, 'id': id, 'year': year})
+
+    # 시리즈
+    base_path = html.xpath('//div[@id="tvpColl"]//div[@id="tab_content"]')[0]
+    num_of_series = base_path.xpath('count(//div[@id="tv_series"]//ul/li/a[@class="f_link_b"])')
+    for i in range(1, int(num_of_series)+1):
+        title = base_path.xpath(
+            '//div[@id="tv_series"]//ul/li[' + str(i) + ']/a[@class="f_link_b"]')[0].text.strip()
+        id = Regex('irk=([^&]+)').search(
+            base_path.xpath('//div[@id="tv_series"]//ul/li[' + str(i) + ']/a[@class="f_link_b"]/@href')[0]).group(1)
+        try:
+            year = base_path.xpath('//div[@id="tv_series"]//ul/li[' + str(i) + ']/span[@class="f_nb"]')[0].text.strip()
+            match = Regex('(\d{4})\.').search(year)
+            if match:
+                year = match.group(1)
+        except Exception:
+            year = ''
+        items.append({'title': title, 'id': id, 'year': year})
+
+    # 동명 콘텐츠
+    base_path = html.xpath('//div[@id="tvpColl"]//div[@id="tab_content"]')[0]
+    num_of_same_name = base_path.xpath(
+        'count(//dt[contains(.,"' + u'동명 콘텐츠' + '")]/following-sibling::dd//a[@class="f_link"])')
+    for i in range(1, int(num_of_same_name)+1):
+        title = base_path.xpath('//dt[contains(.,"' + u'동명 콘텐츠' + '")]/following-sibling::dd//a[' + str(i) +
+                                '][@class="f_link"]')[0].text.strip()
+        id = Regex('irk=([^&]+)&').search(base_path.xpath(
+            '//dt[contains(.,"' + u'동명 콘텐츠' + '")]/following-sibling::dd//a[' + str(i) +
+            '][@class="f_link"]/@href')[0]).group(1)
+        year = base_path.xpath('//dt[contains(.,"' + u'동명 콘텐츠' +
+                               '")]/following-sibling::dd//span[@class="f_eb"][' + str(i) + ']')[0].text.strip()
+        match = Regex('(\d{4})\)').search(year)
+        if match:
+            try:
+                year = match.group(1)
+            except Exception:
+                year = ''
+        items.append({"title": title, "id": id, "year": year})
+
+    for item in items:
+        year = str(item['year'])
+        id = str(item['id'])
+        title = item['title']
+        if year == media.year:
+            score = 85
+        elif len(items) == 1:
+            score = 75
+        else:
+            score = 10
+
+        ratio = SequenceMatcher(None, title, media_name).ratio()
+        score += int(15 * ratio)
+        Log.Debug('ID=%s, media_name=%s, title=%s, year=%s, score=%d' % (id, media_name, title, year, score))
+        results.Append(MetadataSearchResult(id=id, name=title, year=year, score=score, lang=lang))
+
+
+def updateDaumMovieTVSeries(metadata, media):
+    season_url = DAUM_TV_DETAIL % (urllib.quote(media.title.encode('utf8')), metadata.id)
+    html = HTML.ElementFromURL(url=season_url)
+
+    # TV show 기본 메타정보
     metadata.genres.clear()
     metadata.countries.clear()
     metadata.roles.clear()
-    try :
-        html = HTML.ElementFromURL(DAUM_TV_DETAIL % metadata.id)
-    except Exception, e:
-        Log.Debug(repr(e))
-        pass
-    if html :
-        if len(programIds.split(',')) > 1 :
-            # 시리즈인 경우 메타정보
-            tvshowdata = series_json_data['programList'][len(series_json_data['programList'])-1]
-            try: metadata.title = tvshowdata['series'][0]['name'] if tvshowdata['series'] else tvshowdata['name']
-            except: pass
-            try: metadata.original_title = tvshowdata['nameOrg']
-            except: pass
-            try: metadata.rating = float(html.xpath('//div[@class="subject_movie"]/div/em')[0].text)
-            except: pass
-            try: metadata.genres.add(tvshowdata['genre'])
-            except: pass
-            try: metadata.studio = tvshowdata['channels'][0]['name']
-            except: pass
-            if tvshowdata['countries']:
-                try: metadata.countries.add(tvshowdata['countries'][0])
-                except: pass
-            try: metadata.originally_available_at = Datetime.ParseDate(tvshowdata['channels'][0]['startDate']).date()
-            except: pass
-            try: metadata.summary = tvshowdata['introduceDescription'].replace('<BR>','').replace('<br>','').replace('\r\n','\n').strip()
-            except: pass
-            try:
-                poster_url = tvshowdata['mainImageUrl']
-                if poster_url:
-                    poster = HTTP.Request(poster_url)
-                    try: metadata.posters[poster_url] = Proxy.Media(poster)
-                    except: pass
-            except: pass
-        else :
-            #시리즈가 아니거나 시리즈 단독하나만 있을 경우 메타정보
-            try: metadata.title = html.xpath('//div[@class="subject_movie"]/strong')[0].text.strip()
-            except: pass
-            metadata.original_title = ''
-            try: metadata.rating = float(html.xpath('//div[@class="subject_movie"]/div/em')[0].text.strip())
-            except: pass
-            try: metadata.genres.add(html.xpath('//dl[@class="list_movie"]/dd[2]')[0].text.strip())
-            except: pass
-            try: metadata.studio = html.xpath('//dl[@class="list_movie"]/dd[1]/em')[0].text.strip()
-            except: pass
-            match = Regex('(\d{4}\.\d{2}\.\d{2})~(\d{4}\.\d{2}\.\d{2})?').search(html.xpath('//dl[@class="list_movie"]/dd[4]')[0].text.strip())
-            if match:
-                try: metadata.originally_available_at = Datetime.ParseDate(match.group(1)).date()
-                except: pass
-            try: metadata.summary = String.DecodeHTMLEntities(String.StripTags(html.xpath('//div[@class="desc_movie"]')[0].text).strip())
-            except: pass
-            try:
-                poster_url = html.xpath('//img[@class="img_summary"]/@src')[0].strip()
-                if poster_url:
-                   poster = HTTP.Request(poster_url)
-                   try: metadata.posters[poster_url] = Proxy.Media(poster)
-                   except: pass
-            except: pass 
 
-    # 시즌 메타정보 업데이트
-    # 시즌 요약정보는 버그인지 업데이트가 되지 않는다
-    # 다음 메타 정보는 부가방송과 같은 특별편에 대한 정보가 없거나 번호를 부여하지 않는 경우가 있다.
-    # 이를 위해서 특별편에 대한 정보는 JSON파일로 처리하도록 하였다.
-    # 그래서 다음에서 메타데이터를 가져올 때 시즌 0는 제외
-    if '0' in season_num_list:
-        season_num_list.remove('0')
+    metadata.title = html.xpath('//div[@class="tit_program"]/strong')[0].text
+    metadata.title_sort = unicodedata.normalize('NFKD', metadata.title[0])[0] + ' ' + metadata.title
+    # metadata.original_title = ''
+    metadata.rating = None
+    metadata.genres.add(Regex(u'(.*?)(?:\u00A0(\(.*\)))?$').search(html.xpath(
+        u'//dt[.="장르"]/following-sibling::dd/text()')[0]).group(1))
+    metadata.studio = html.xpath('//div[@class="txt_summary"]/span[1]')[0].text
+    match = Regex('(\d+\.\d+\.\d+)~(\d+\.\d+\.\d+)?').search(html.xpath('//div[@class="txt_summary"]/span[3]')[0].text)
+    if match:
+        metadata.originally_available_at = Datetime.ParseDate(match.group(1)).date()
+    metadata.summary = String.DecodeHTMLEntities(
+        String.StripTags(html.xpath(u'//dt[.="소개"]/following-sibling::dd')[0].text).strip())
 
-    for season_num, season_json in zip(season_num_list, series_json_data['programList']):
-        if str(season_num) in season_num_list:
-            programId= season_json['programId']
-            season = metadata.seasons[season_num]
-            try:  season.summary = season_json['introduceDescription'].replace('\r\n','\n').strip()
-            except: pass
-            try:
-                poster_url = season_json['mainImageUrl']
-                if poster_url:
-                    poster = HTTP.Request(poster_url)
-                    try: season.posters[poster_url] = Proxy.Media(poster)
-                    except: pass
-            except: pass
+    poster_url = urllib.unquote(Regex('fname=(.*)').search(
+        html.xpath('//div[@class="info_cont"]/div[@class="wrap_thumb"]/a/img/@src')[0]).group(1))
+    metadata.posters[poster_url] = Proxy.Media(HTTP.Request(poster_url))
 
-            #시즌 별 에피소드 메타정보 업데이트
-            episodepage = HTTP.Request(DAUM_TV_EPISODE % programId)
-            match = Regex('MoreView\.init\(\d+, (.*?)}]\);', Regex.DOTALL).search(episodepage.content)
-            if match:
-                json_data = match.group(1) + '}]'
-                episode_json_data = JSON.ObjectFromString(json_data, max_size = JSON_MAX_SIZE)
-                for episodedata in episode_json_data:
-                    episode_num = episodedata['name']
-                    if not episode_num: continue
-                    episode = metadata.seasons[season_num].episodes[int(episode_num)]
-                    try:  episode.title = episodedata['title'].strip()
-                    except: pass
-                    try:
-                        summary = episodedata['introduceDescription'].replace('\r\n', '\n').replace('<br>', '\n').replace('<BR>', '\n').strip()
-                        episode.summary = '\n'.join([line.strip() for line in summary.splitlines()])
-                        episode.summary = episode.summary.replace('!|', '\n')
-                    except: pass
-                    if episodedata['channels'][0]['broadcastDate']:
-                        try:
-                            episode.originally_available_at = Datetime.ParseDate(episodedata['channels'][0]['broadcastDate'], '%Y%m%d').date()
-                        except: pass
-                    else :
-                        try:
-                            episode.originally_available_at = Datetime.ParseDate(episodedata['channels'][1]['broadcastDate'], '%Y%m%d').date()
-                        except: pass
-                    try: episode.rating = float(episodedata['rate'])
-                    except: pass
-                    episode.directors.clear()
-                    episode.producers.clear()
-                    episode.writers.clear()
-                    #감독, 각본  메타정보 업데이트
-                    for crewdata in season_json['crews']:
-                        if crewdata['type'] in  [u'감독', u'연출', u'기획']:
-                            episode_director = episode.directors.new()
-                            try: episode_director.name = crewdata['name']
-                            except: pass
-                            try: episode_director.photo = crewdata['mainImageUrl']
-                            except: pass
-                        if crewdata['type'] == u'제작':
-                            episode_producer = episode.producers.new()
-                            try: episode_producer.name = crewdata['name']
-                            except: pass
-                            try: episode_producer.photo = crewdata['mainImageUrl']
-                            except: pass
-                        if crewdata['type'] in  [u'극본', u'각본']:
-                            episode_writer = episode.writers.new()
-                            try: episode_writer.name = crewdata['name']
-                            except: pass
-                            try: episode_writer.photo = crewdata['mainImageUrl']
-                            except: pass
- 
-            #출연진 정보
-            for actor_info in season_json['castings']:
-                if actor_info['homoId'] not in actor_data:
-                    actor_data[actor_info['homoId']] = {}
-                    actor_data[actor_info['homoId']]['ordering'] = actor_info['ordering']
-                    actor_data[actor_info['homoId']]['name'] = actor_info['name'].strip()
-                    actor_data[actor_info['homoId']]['role'] = actor_info['characterName'] if actor_info['characterName'].strip() else actor_info['type'].strip()
-                    actor_data[actor_info['homoId']]['photo'] = actor_info['mainImageUrl'] if actor_info['mainImageUrl'].strip() else actor_info['characterMainImageUrl'].strip()
-
-# Root 폴더에 tvhow JSON 파일이 있는지 확인
-# tvshow JSON 파일은 Root 폴더와 동일한 이름.json
-# tvshow JSON 파일이 있으면 tvshow 메타정보 JSON파일 내용으로 업데이트
-    root, current_folder = GetCurrentFolder(PLEX_LIBRARY, media.id)
-    jsonfiles = []
-    dirs = []
-    for dirpaths, dirnames, files in os.walk(os.path.join(root, current_folder)):
-        for filename in files:
-            if filename.endswith(('.json')):
-                jsonfile =  os.path.join(dirpaths, filename).decode('utf-8')
-                jsonfiles.append(jsonfile)
-        dirs.append(dirpaths.decode('utf-8'))
-
-    tvshowfile = current_folder + '.json'
-    tvshowfile = os.path.join(root, current_folder, tvshowfile)
-    tvshowfile = unicodedata.normalize('NFKC', unicode(tvshowfile)).strip()
-
-    if os.path.exists(tvshowfile):
-        Log.Info("Update TV Show Metadata " + tvshowfile)
-        tvshowdata = json.loads(Core.storage.load(tvshowfile))
-        try: metadata.title = tvshowdata['title'].strip()
-        except: pass
-        try: metadata.original_title = tvshowdata['original_title'].strip()
-        except: pass
-        try: metadata.rating = float(tvshowdata['rating'].strip())
-        except: pass
-        try: metadata.studio = tvshowdata['studio'].strip()
-        except: pass
-        try: metadata.summary = tvshowdata['summary'].strip()
-        except: pass
-        try: metadata.year = tvshowdata['year'].strip()
-        except: pass
-        try: metadata.originally_available_at = Datetime.ParseDate(tvshowdata['originally_available_at'].strip()).date()
-        except: pass
-        try:
-            poster_url = None
-            poster_url = tvshowdata['poster'].strip()
-            if poster_url:
-                poster = HTTP.Request(poster_url)
-                try: metadata.posters[poster_url] = Proxy.Media(poster)
-                except: pass
-        except: pass
-        try:
-            for genre in tvshowdata['genres']:
-                 metadata.genres.add(genre.strip())
-        except: pass
-        try:
-            for country in tvshowdata['countries']:
-                metadata.countries.add(country.strip())
-        except: pass
-
-    #시즌별 JSON 파일이 있으면 메타정보 업데이트
-    #시즌 JSON 파일은 각각의 시즌 폴더에 위치
-    #파일명은
-    #Root 폴더명 시즌 1.json(시즌 01, 시즌01, 시즌001 등 가능)
-    #Root 폴더명 season 1.json(season1, Season 01 등 가능)
+    # 시즌 정보 시작
+    season_num_list = []
     for season_num in media.seasons:
-        if season_num == '0' :
-            pattern = r'(특별편|Special)$'
-            pattern = pattern.decode('utf-8')
-            regex = re.compile(pattern)
-        else :
-            pattern = r'(시즌|Season).*\b0*?{}\b$'
-            pattern = pattern.decode('utf-8')
-            regex = re.compile(pattern.format(str(season_num)))
-        
-        season_dir = filter(regex.search, dirs)
-        if len(media.seasons) == 1:
-            seasonpath = os.path.dirname(tvshowfile)
-            seasonfile = tvshowfile
-        else:
-            try:
-                seasonpath = season_dir[0]
-                seasonfile = os.path.basename(seasonpath) + '.json'
-                seasonfile = os.path.join(seasonpath, seasonfile)
-                seasonfile = unicodedata.normalize('NFKC', unicode(seasonfile)).strip()
-            except:
-                seasonpath = os.path.dirname(tvshowfile)
-                seasonfile = ''
+        if '0' != season_num:
+            season_num_list.append(season_num)
+    season_num_list.sort(key=int)
 
-        #시즌 메타정보 업데이트
-        if os.path.exists(seasonfile):
-            seasondata = json.loads(Core.storage.load(seasonfile))
-            if len(media.seasons) != 1:
-                Log.Info("Update TV Season Metadata " + seasonfile)
-                season = metadata.seasons[season_num]
-                try:  season.summary = seasondata['summary'].strip()
-                except: pass
-                try:
-                    poster_url = None
-                    poster_url = seasondata['poster'].strip()
-                    if poster_url:
-                        poster = HTTP.Request(poster_url)
-                        try: season.posters[poster_url] = Proxy.Media(poster)
-                        except: pass
-                except: pass
-            
-            #출연진 정보 가져오기
-            try:
-                json_actor_data[season_num] = {}
-                json_actor_data[season_num]= seasondata['roles']
-            except: pass
+    # 각 시즌 URL 획득
+    season_urls_list = {'1': season_url}
+    num_of_seasons = int(html.xpath('count(//div[@id="series"]/ul/li)'))
 
-        #에피소드 메타정보 업데이트
-        pattern = r'(특별편|Special)\.json$'
-        pattern = pattern.decode('utf-8')
-        Log.Info(pattern)
-        for dirpaths, dirnames, files in os.walk(seasonpath):
-            for filename in files:
-                if filename.endswith(('.json')):
-                    episodefile = os.path.join(dirpaths, filename)
-                    episodefile = unicodedata.normalize('NFKC', unicode(episodefile)).strip()
-                    checkspecial = re.search(pattern, episodefile)
-                    if checkspecial and int(season_num) !=  0: continue
-                    if os.path.exists(episodefile):
-                        episodedata = json.loads(Core.storage.load(episodefile))
-                        if 'episodes' in episodedata:
-                            Log.Info("Update TV Episode Metadata " + episodefile) 
-                            for episodeinfo in episodedata['episodes']:
-                                episode_num = episodeinfo['name']
-                                if not episode_num: continue
-                                episode = metadata.seasons[season_num].episodes[int(episode_num)]
-                                try: episode.title = episodeinfo['title'].strip()
-                                except: pass
-                                try: episode.summary = episodeinfo['introduceDescription'].strip()
-                                except: pass
-                                try: episode.originally_available_at = Datetime.ParseDate(episodeinfo['broadcastDate'], '%Y%m%d').date()
-                                except: pass
-                                #감독, 각본  메타정보 업데이트
-                                if 'directors' in episodedata:
-                                    episode.directors.clear()
-                                    for director in episodedata['directors']:
-                                        episode_director = episode.directors.new()
-                                        try: episode_director.name = director['name']
-                                        except: pass
-                                        try: episode_director.photo = director['photo']
-                                        except: pass
-                                if 'producers' in episodedata:
-                                    episode.producers.clear()
-                                    for producer in episodedata['producers']:
-                                        episode_producer = episode.producers.new()
-                                        try: episode_producer.name = producer['name']
-                                        except: pass
-                                        try: episode_producer.photo = producer['photo']
-                                        except: pass
-                                if 'writers' in episodedata:
-                                    episode.writers.clear()
-                                    for writer in episodedata['writers']:
-                                        episode_writer = episode.writers.new()
-                                        try: episode_writer.name = writer['name']
-                                        except: pass
-                                        try: episode_writer.photo = writer['photo']
-                                        except: pass
-    #Set Actors Info
-    if json_actor_data:
-        i = 0
-        actor_name = []
-        for idx, actor_info in json_actor_data.items():
-            for actor in actor_info:
-                meta_role = metadata.roles.new()
-                meta_role.name = actor['name']
-                actor_name.append(actor['name'])
-                meta_role.role = actor['role']
-                if actor['role'] in [u'출연', u'특별출연', u'진행', u'내레이션', u'심사위원', u'고정쿠르', u'쿠르']:
-                    meta_role.role = actor['role'] + ' '*i
-                    i += 1
-                else:
-                    meta_role.role = actor['role']
-                meta_role.photo = actor['photo']
-        for idx, actor in actor_data.items():
-            if actor['name'] not in actor_name:
-                meta_role = metadata.roles.new()
-                meta_role.name = actor['name']
-                if actor['role'] in [u'출연', u'특별출연', u'진행', u'내레이션', u'심사위원', u'고정쿠르', u'쿠르']:
-                    meta_role.role = actor['role'] + ' '*i
-                    i += 1
-                else:
-                    meta_role.role = actor['role']
-                meta_role.photo = actor['photo']
-    else:
-        i = 0
-        for idx, actor in actor_data.items():
-            meta_role = metadata.roles.new()
-            meta_role.name = actor['name']
-            if actor['role'] in [u'출연', u'특별출연', u'진행', u'내레이션', u'심사위원', u'고정쿠르', u'쿠르']:
-                meta_role.role = actor['role'] + ' '*i
-                i += 1
-            else:
-                meta_role.role = actor['role']
-            meta_role.photo = actor['photo']
+    for i in range(num_of_seasons, 0, -1):
+        xpath = '//div[@id="series"]/ul/li[' + str(i) + ']/a[@class="f_link_b"]/@href'
+        season_name = urllib.unquote(Regex('q=([^&]+)&').search(html.xpath(xpath)[0]).group(1))
+        season_id = Regex('irk=([^&]+)&').search(html.xpath(xpath)[0]).group(1)
 
-def GetSpecialSeason(metadata, media):
-    poster_url = None
-    season = metadata.seasons[0]
-    for e in media.seasons[0].episodes:
-        filefolder = os.path.dirname(media.seasons[0].episodes[e].items[0].parts[0].file)
-    filename = os.path.basename(os.path.normpath(filefolder))
-    jsonfile = os.path.join(filefolder, filename + '.json')
-    jsonfile = unicodedata.normalize('NFKC', unicode(jsonfile)).strip()
-    if os.path.exists(jsonfile):
-        data = json.loads(Core.storage.load(jsonfile))
-        try:
-            poster_url = data['poster']
-            if poster_url:
-                poster = HTTP.Request(poster_url)
-                try: season.posters[poster_url] = Proxy.Media(poster)
-                except: pass
-        except: pass
+        season_url = DAUM_TV_DETAIL % (urllib.quote(season_name.encode('utf8')), season_id)
+        season_urls_list[str(num_of_seasons - i + 2)] = season_url
 
-        for episode_data in data['episodes']:
-            episode_num = episode_data['name']
-            if not episode_num: continue
-            episode = metadata.seasons[0].episodes[int(episode_num)]
-            episode.title = episode_data['title']
-            episode.summary = episode_data['introduceDescription'].strip()
-            episode.originally_available_at = Datetime.ParseDate(episode_data['broadcastDate'], '%Y%m%d').date()
-        try:
-            return data['roles']
-        except:
-            return None
-    else:
-        return None
+    # 각 시즌 데이터 반영
+    for season_num in season_num_list:
+        season = metadata.seasons[season_num]
+        season_url = season_urls_list[season_num]
+        html = HTML.ElementFromURL(url=season_url)
+        xpath = '//div[@class="info_cont"]/div[@class="wrap_thumb"]/a/img/@src'
+        poster_url = urllib.unquote(Regex('fname=(.*)').search(html.xpath(xpath)[0]).group(1))
+        season.posters[poster_url] = Proxy.Media(HTTP.Request(poster_url))
+        season.summary = html.xpath(u'//dt[.="소개"]/following-sibling::dd/text()')[0].strip()
 
-def GetPlexLibrary():
-    PLEX_LIBRARY = []
-    PLEX_LIBRARY_URL = 'http://127.0.0.1:32400/library/sections'
-    library_json = JSON.ObjectFromURL(PLEX_LIBRARY_URL)
-    for library in library_json['MediaContainer']['Directory']:
-        for path in library['Location']:
-            PLEX_LIBRARY.append(path['path'])
-    return PLEX_LIBRARY
+        # 각 시즌 에피소드 반영
 
-def GetCurrentFolder(PLEX_LIBRARY, id):
-    pageUrl = "http://127.0.0.1:32400/library/metadata/" + id + "/tree"
-    filejson = JSON.ObjectFromURL(pageUrl)
-    filepath = filejson['MediaContainer']['MetadataItem'][0]['MetadataItem'][0]['MetadataItem'][0]['MediaItem'][0]['MediaPart'][0]['file'].encode('utf-8')
-    for root in [os.sep.join(filepath.split(os.sep)[0:x+2]) for x in range(0, filepath.count(os.sep))]:
-        if root in PLEX_LIBRARY:
-             path = os.path.relpath(filepath, root)
-             current_folder = path.split(os.sep)[0]
-             break;
-    return root, current_folder;
 
-####################################################################################################
 class DaumMovieAgent(Agent.Movies):
     name = "Daum Movie TV Series"
-    languages = [Locale.Language.Korean]
     primary_provider = True
+    languages = [Locale.Language.Korean]
     accepts_from = ['com.plexapp.agents.localmedia']
 
     def search(self, results, media, lang, manual=False):
@@ -703,6 +368,7 @@ class DaumMovieAgent(Agent.Movies):
 
     def update(self, metadata, media, lang):
         updateDaumMovie(metadata)
+
 
 class DaumMovieTVSeriesAgent(Agent.TV_Shows):
     name = "Daum Movie TV Series"
@@ -714,6 +380,7 @@ class DaumMovieTVSeriesAgent(Agent.TV_Shows):
         return searchDaumMovieTVSeries(results, media, lang)
 
     def update(self, metadata, media, lang):
+        '''
         season_num_list = []
         programId = []
         for season_num in media.seasons:
@@ -729,7 +396,7 @@ class DaumMovieTVSeriesAgent(Agent.TV_Shows):
             programIds = ','.join(programIds.split(',')[::-1])
         if not programIds:
             programIds = metadata.id
-        else :
+        else:
             metadata.id = programId[0]
-        updateDaumMovieTVSeries(metadata, media, programIds)
-
+        '''
+        updateDaumMovieTVSeries(metadata, media)
