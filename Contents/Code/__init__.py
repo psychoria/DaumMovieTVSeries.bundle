@@ -17,7 +17,7 @@ DAUM_MOVIE_PHOTO = "http://movie.daum.net/data/movie/photo/movie/list.json?pageN
 
 DAUM_TV_SRCH = "https://search.daum.net/search?w=tot&q=%s"
 DAUM_TV_DETAIL = "https://search.daum.net/search?w=tv&q=%s&irk=%s&irt=tv-program&DA=TVP"
-DAUM_TV_EPISODE = "http://movie.daum.net/tv/episode?tvProgramId=%s"
+# DAUM_TV_EPISODE = "http://movie.daum.net/tv/episode?tvProgramId=%s"
 DAUM_TV_SERIES = "http://movie.daum.net/tv/series_list.json?tvProgramId=%s&programIds=%s"
 JSON_MAX_SIZE = 10 * 1024 * 1024
 
@@ -300,6 +300,7 @@ def searchDaumMovieTVSeries(results, media, lang):
 
 
 def updateDaumMovieTVSeries(metadata, media):
+    Log.Debug('update: %s %s' % (media.title, metadata.id))
     season_url = DAUM_TV_DETAIL % (urllib.quote(media.title.encode('utf8')), metadata.id)
     html = HTML.ElementFromURL(url=season_url)
 
@@ -338,8 +339,9 @@ def updateDaumMovieTVSeries(metadata, media):
 
     for i in range(num_of_seasons, 0, -1):
         xpath = '//div[@id="series"]/ul/li[' + str(i) + ']/a[@class="f_link_b"]/@href'
-        season_name = urllib.unquote(Regex('q=([^&]+)&').search(html.xpath(xpath)[0]).group(1))
-        season_id = Regex('irk=([^&]+)&').search(html.xpath(xpath)[0]).group(1)
+        season_info = html.xpath(xpath)[0]
+        season_name = urllib.unquote(Regex('q=([^&]+)&').search(season_info).group(1))
+        season_id = Regex('irk=([^&]+)&').search(season_info).group(1)
 
         season_url = DAUM_TV_DETAIL % (urllib.quote(season_name.encode('utf8')), season_id)
         season_urls_list[str(num_of_seasons - i + 2)] = season_url
@@ -355,6 +357,53 @@ def updateDaumMovieTVSeries(metadata, media):
         season.summary = html.xpath(u'//dt[.="소개"]/following-sibling::dd/text()')[0].strip()
 
         # 각 시즌 에피소드 반영
+        episode_num_list = []
+        for episode_num in media.seasons[season_num].episodes:
+            episode_num_list.append(episode_num)
+        episode_num_list.sort(key=int)
+
+        episode_urls_list = {}
+        num_of_episodes = int(html.xpath('count(//ul[@id="clipDateList"]/li)'))
+
+        for i in range(1, num_of_episodes + 1):
+            episode_info = html.xpath('//ul[@id="clipDateList"]/li[' + str(i) + ']/a[@class="btn_item"]/@href')[0]
+            episode_name = urllib.unquote(Regex('q=([^&]+)&').search(episode_info).group(1))
+            episode_id = Regex('irk=([^&]+)&').search(episode_info).group(1)
+
+            episode_url = DAUM_TV_DETAIL % (urllib.quote(episode_name.encode('utf8')), episode_id)
+            try:
+                num_of_episode = html.xpath('//ul[@id="clipDateList"]/li[' + str(i) +
+                                            ']//a[@class="btn_item"]/span[@class="txt_episode"]')[0].text.strip()
+                num_of_episode = Regex('(\d+)').search(num_of_episode).group(1)
+                episode_urls_list[num_of_episode] = episode_url
+            except Exception:
+                pass
+
+        for episode_num in episode_num_list:
+            if not (episode_num in episode_urls_list):
+                continue
+
+            episode = season.episodes[episode_num]
+            episode_url = episode_urls_list[episode_num]
+            html = HTML.ElementFromURL(url=episode_url)
+
+            episode.summary = '\n'.join(txt.strip() for txt in html.xpath('//p[@class="episode_desc"]//text()')).strip()
+            episode.rating = None
+
+            date_xpath = html.xpath('//div[@class="tit_episode"]/span[@class="txt_date "]')
+            originally_aired = ''
+            if date_xpath:
+                match = Regex('(\d+\.\d+\.\d+)').search(date_xpath[0].text.strip())
+                if match:
+                    episode.originally_available_at = Datetime.ParseDate(match.group(1)).date()
+                    originally_aired = str(episode.originally_available_at)
+
+            xpath = '//p[@class="episode_desc"]//strong//text()'
+            title = html.xpath(xpath)
+            if title:
+                episode.title = title[0].strip()
+            else:
+                episode.title = originally_aired
 
 
 class DaumMovieAgent(Agent.Movies):
